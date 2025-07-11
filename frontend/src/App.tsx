@@ -106,9 +106,13 @@ function App() {
 
   return (
     <div className="App">
-      <div className="app-header">
-        <h1 className="app-title">{config.UI.BANNER_TEXT}</h1>
-      </div>
+      <header className="App-header">
+        <h1>{config.UI.BANNER_TEXT}</h1>
+        {/* Debug info - remove this after fixing */}
+        <div style={{ fontSize: '12px', color: '#666', marginBottom: '20px' }}>
+          API Base: {config.API.AUDIT}
+        </div>
+      </header>
       
       <div className="provider-section">
         <div className="provider-container">
