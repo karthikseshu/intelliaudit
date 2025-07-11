@@ -1,0 +1,20 @@
+[
+  {
+    "criteria": "Presence of company name",
+    "category": "General",
+    "description": "Document should mention the company name.",
+    "id": "C1"
+  },
+  {
+    "criteria": "Date of issue",
+    "category": "General",
+    "description": "Document should have a date of issue.",
+    "id": "C2"
+  },
+  {
+    "criteria": "Signature block",
+    "category": "Validation",
+    "description": "Document should have a signature block.",
+    "id": "C3"
+  }
+] 
