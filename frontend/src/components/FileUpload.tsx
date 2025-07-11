@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { config } from '../config';
 
 type FileUploadProps = {
   onUpload: (text: string, pages: Array<{ page: number; text: string }>) => void;
@@ -20,7 +21,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUpload }) => {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const res = await fetch('/api/audit/upload', {
+      const res = await fetch(`${config.API.AUDIT}/upload`, {
         method: 'POST',
         body: formData,
       });
