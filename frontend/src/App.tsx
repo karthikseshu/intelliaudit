@@ -34,10 +34,13 @@ const MODEL_OPTIONS = {
 type AuditResult = {
   criteria: string;
   category: string;
+  factor?: string;
   page: number | null;
   evidence: string;
   explanation: string;
   remarks: string;
+  compliance_score?: number;
+  risk_level?: string;
   accepted: boolean;
 };
 
@@ -86,8 +89,18 @@ function App() {
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
-      // Summarize findings using LLM
-      const prompt = `Summarize the following audit findings and recommendations by criteria and category: ${JSON.stringify(results)}`;
+      // Summarize findings using LLM with NCQA-specific focus
+      const prompt = `As a healthcare compliance expert, provide a comprehensive summary of the following NCQA audit findings. Include:
+
+1. Overall compliance assessment with compliance scores and risk levels
+2. Critical findings that require immediate attention
+3. Recommendations by category (Credentialing, Quality Management, Care Management, etc.)
+4. Risk assessment summary
+5. Priority action items
+
+Audit Results: ${JSON.stringify(results)}
+
+Format the response as a structured report with clear sections for each category and overall recommendations.`;
       const res = await promptLLM(prompt, selectedModel, selectedProvider);
       setSummary(res.data.response);
     } catch (error) {

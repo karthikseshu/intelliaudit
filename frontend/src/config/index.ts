@@ -7,6 +7,6 @@ export const config = {
     CONFIG: `${API_BASE_URL}/api/config`,
   },
   UI: {
-    BANNER_TEXT: 'IntelliAudit - Intelligent AI Audit Platform',
+    BANNER_TEXT: 'IntelliAudit - NCQA Healthcare Compliance Audit Platform',
   },
 }; 

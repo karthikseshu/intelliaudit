@@ -1,0 +1,302 @@
+[
+  {
+    "id": "NCQA-1",
+    "category": "Credentialing and Recredentialing",
+    "factor": "Provider Credentialing Process",
+    "criteria": "Provider credentialing process includes verification of current license",
+    "description": "Document must demonstrate that the credentialing process includes verification of current state license, DEA registration, and board certification status. The process should include primary source verification and be completed within 180 days of application.",
+    "compliance_requirements": [
+      "Primary source verification of current license",
+      "DEA registration verification",
+      "Board certification verification",
+      "180-day completion requirement",
+      "Documentation of verification process"
+    ],
+    "evidence_required": [
+      "Credentialing policy and procedure",
+      "Verification forms or checklists",
+      "Documentation of primary source contacts",
+      "Timeline tracking system"
+    ]
+  },
+  {
+    "id": "NCQA-2",
+    "category": "Credentialing and Recredentialing",
+    "factor": "Provider Credentialing Process",
+    "criteria": "Credentialing process includes verification of education and training",
+    "description": "The credentialing process must include verification of education and training credentials from primary sources. This includes medical school graduation, residency completion, and fellowship training if applicable.",
+    "compliance_requirements": [
+      "Primary source verification of medical education",
+      "Residency training verification",
+      "Fellowship verification (if applicable)",
+      "Documentation of verification process",
+      "Maintenance of verification records"
+    ],
+    "evidence_required": [
+      "Education verification forms",
+      "Training verification documentation",
+      "Primary source contact records",
+      "Credentialing committee minutes"
+    ]
+  },
+  {
+    "id": "NCQA-3",
+    "category": "Credentialing and Recredentialing",
+    "factor": "Recredentialing Process",
+    "criteria": "Recredentialing process conducted at least every 36 months",
+    "description": "The organization must conduct recredentialing of all providers at least every 36 months. The process should include verification of continued qualifications and performance evaluation.",
+    "compliance_requirements": [
+      "36-month recredentialing cycle",
+      "Continued qualification verification",
+      "Performance evaluation",
+      "Quality indicator review",
+      "Documentation of recredentialing decision"
+    ],
+    "evidence_required": [
+      "Recredentialing schedule",
+      "Performance evaluation criteria",
+      "Quality indicator reports",
+      "Recredentialing committee decisions"
+    ]
+  },
+  {
+    "id": "NCQA-4",
+    "category": "Member Rights and Responsibilities",
+    "factor": "Member Rights",
+    "criteria": "Clear statement of member rights and responsibilities",
+    "description": "The organization must provide clear, written information about member rights and responsibilities. This should include grievance and appeal procedures, confidentiality protections, and access to care requirements.",
+    "compliance_requirements": [
+      "Written member rights statement",
+      "Grievance and appeal procedures",
+      "Confidentiality protections",
+      "Access to care information",
+      "Non-discrimination policy"
+    ],
+    "evidence_required": [
+      "Member handbook or rights document",
+      "Grievance procedure documentation",
+      "Appeal process description",
+      "Confidentiality policy"
+    ]
+  },
+  {
+    "id": "NCQA-5",
+    "category": "Member Rights and Responsibilities",
+    "factor": "Member Responsibilities",
+    "criteria": "Member responsibilities clearly communicated",
+    "description": "The organization must clearly communicate member responsibilities including providing accurate information, following treatment plans, and understanding benefit limitations.",
+    "compliance_requirements": [
+      "Clear communication of responsibilities",
+      "Treatment plan compliance",
+      "Accurate information provision",
+      "Benefit limitation understanding",
+      "Appointment attendance requirements"
+    ],
+    "evidence_required": [
+      "Member responsibility documentation",
+      "Communication materials",
+      "Treatment plan templates",
+      "Benefit explanation materials"
+    ]
+  },
+  {
+    "id": "NCQA-6",
+    "category": "Utilization Management",
+    "factor": "Utilization Management Program",
+    "criteria": "Utilization management program with written criteria",
+    "description": "The organization must have a utilization management program with written clinical criteria for decision-making. The program should include pre-service, concurrent, and post-service review processes.",
+    "compliance_requirements": [
+      "Written clinical criteria",
+      "Pre-service review process",
+      "Concurrent review process",
+      "Post-service review process",
+      "Appeal rights notification"
+    ],
+    "evidence_required": [
+      "UM program description",
+      "Clinical criteria documentation",
+      "Review process procedures",
+      "Appeal notification templates"
+    ]
+  },
+  {
+    "id": "NCQA-7",
+    "category": "Utilization Management",
+    "factor": "Utilization Management Decisions",
+    "criteria": "Utilization management decisions made by qualified clinical personnel",
+    "description": "All utilization management decisions must be made by qualified clinical personnel with appropriate training and experience in the relevant clinical area.",
+    "compliance_requirements": [
+      "Qualified clinical personnel",
+      "Appropriate training and experience",
+      "Clinical decision-making authority",
+      "Supervision requirements",
+      "Documentation of qualifications"
+    ],
+    "evidence_required": [
+      "Staff qualification records",
+      "Training documentation",
+      "Clinical decision protocols",
+      "Supervision structure"
+    ]
+  },
+  {
+    "id": "NCQA-8",
+    "category": "Quality Management and Improvement",
+    "factor": "Quality Management Program",
+    "criteria": "Comprehensive quality management program",
+    "description": "The organization must have a comprehensive quality management program that includes quality assessment, improvement activities, and performance measurement across all aspects of care delivery.",
+    "compliance_requirements": [
+      "Quality assessment activities",
+      "Performance measurement",
+      "Improvement initiatives",
+      "Data collection and analysis",
+      "Stakeholder involvement"
+    ],
+    "evidence_required": [
+      "Quality management plan",
+      "Performance measurement tools",
+      "Improvement project documentation",
+      "Data analysis reports"
+    ]
+  },
+  {
+    "id": "NCQA-9",
+    "category": "Quality Management and Improvement",
+    "factor": "Performance Measurement",
+    "criteria": "Performance measurement using HEDIS or equivalent measures",
+    "description": "The organization must conduct performance measurement using HEDIS measures or equivalent standardized measures to assess quality of care and service delivery.",
+    "compliance_requirements": [
+      "HEDIS measure implementation",
+      "Data collection methodology",
+      "Performance reporting",
+      "Benchmark comparison",
+      "Improvement tracking"
+    ],
+    "evidence_required": [
+      "HEDIS measure specifications",
+      "Data collection procedures",
+      "Performance reports",
+      "Benchmark data sources"
+    ]
+  },
+  {
+    "id": "NCQA-10",
+    "category": "Care Management",
+    "factor": "Care Management Program",
+    "criteria": "Care management program for high-risk populations",
+    "description": "The organization must have a care management program that identifies and manages high-risk populations, including those with chronic conditions, complex care needs, or multiple comorbidities.",
+    "compliance_requirements": [
+      "High-risk population identification",
+      "Care management protocols",
+      "Intervention strategies",
+      "Outcome measurement",
+      "Provider coordination"
+    ],
+    "evidence_required": [
+      "Care management program description",
+      "Risk stratification tools",
+      "Intervention protocols",
+      "Outcome measurement tools"
+    ]
+  },
+  {
+    "id": "NCQA-11",
+    "category": "Care Management",
+    "factor": "Care Coordination",
+    "criteria": "Care coordination across providers and settings",
+    "description": "The organization must ensure care coordination across multiple providers and care settings, including transitions of care and communication between providers.",
+    "compliance_requirements": [
+      "Provider communication protocols",
+      "Transition of care processes",
+      "Care plan sharing",
+      "Medication reconciliation",
+      "Follow-up coordination"
+    ],
+    "evidence_required": [
+      "Care coordination procedures",
+      "Transition protocols",
+      "Communication templates",
+      "Medication reconciliation forms"
+    ]
+  },
+  {
+    "id": "NCQA-12",
+    "category": "Network Management",
+    "factor": "Provider Network Adequacy",
+    "criteria": "Adequate provider network to meet member needs",
+    "description": "The organization must maintain an adequate provider network that meets member access needs, including appropriate geographic distribution and specialty coverage.",
+    "compliance_requirements": [
+      "Geographic accessibility",
+      "Specialty coverage",
+      "Appointment availability",
+      "Network adequacy standards",
+      "Access monitoring"
+    ],
+    "evidence_required": [
+      "Network adequacy analysis",
+      "Provider directory",
+      "Access standards documentation",
+      "Monitoring reports"
+    ]
+  },
+  {
+    "id": "NCQA-13",
+    "category": "Network Management",
+    "factor": "Provider Network Monitoring",
+    "criteria": "Ongoing monitoring of provider network performance",
+    "description": "The organization must conduct ongoing monitoring of provider network performance, including quality indicators, access measures, and member satisfaction.",
+    "compliance_requirements": [
+      "Performance monitoring",
+      "Quality indicator tracking",
+      "Access measure monitoring",
+      "Member satisfaction surveys",
+      "Provider feedback mechanisms"
+    ],
+    "evidence_required": [
+      "Monitoring protocols",
+      "Performance reports",
+      "Survey results",
+      "Feedback documentation"
+    ]
+  },
+  {
+    "id": "NCQA-14",
+    "category": "Clinical Practice Guidelines",
+    "factor": "Evidence-Based Guidelines",
+    "criteria": "Clinical practice guidelines based on evidence-based medicine",
+    "description": "The organization must develop and maintain clinical practice guidelines that are based on evidence-based medicine and current clinical standards.",
+    "compliance_requirements": [
+      "Evidence-based development",
+      "Regular review and updates",
+      "Provider education",
+      "Implementation monitoring",
+      "Outcome evaluation"
+    ],
+    "evidence_required": [
+      "Clinical practice guidelines",
+      "Evidence review documentation",
+      "Provider education materials",
+      "Implementation tracking"
+    ]
+  },
+  {
+    "id": "NCQA-15",
+    "category": "Clinical Practice Guidelines",
+    "factor": "Guideline Implementation",
+    "criteria": "Systematic implementation of clinical practice guidelines",
+    "description": "The organization must have a systematic approach to implementing clinical practice guidelines, including provider education, monitoring, and feedback mechanisms.",
+    "compliance_requirements": [
+      "Systematic implementation",
+      "Provider education",
+      "Monitoring mechanisms",
+      "Feedback processes",
+      "Performance improvement"
+    ],
+    "evidence_required": [
+      "Implementation plan",
+      "Education program documentation",
+      "Monitoring tools",
+      "Feedback reports"
+    ]
+  }
+] 
