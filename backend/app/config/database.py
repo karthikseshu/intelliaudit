@@ -6,15 +6,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Supabase connection string with URL-encoded password
-username = "postgres.gestigjpiefkwstawvzx"
-password = quote_plus("IntelliAudit$2025")  # URL-encode the new password
-host = "aws-0-us-east-2.pooler.supabase.com"
-port = "6543"  # Correct port for Supabase
-database = "postgres"
+# Database configuration with environment variable support for Render deployment
+username = os.getenv("DB_USERNAME", "postgres.gestigjpiefkwstawvzx")
+password = os.getenv("DB_PASSWORD", "IntelliAudit$2025")
+host = os.getenv("DB_HOST", "aws-0-us-east-2.pooler.supabase.com")
+port = os.getenv("DB_PORT", "6543")
+database = os.getenv("DB_NAME", "postgres")
+schema = os.getenv("DB_SCHEMA", "intelliaudit_dev")
 
-DATABASE_URL = f"postgresql://{username}:{password}@{host}:{port}/{database}"
-DB_SCHEMA = 'intelliaudit_dev'
+# URL-encode the password
+encoded_password = quote_plus(password)
+
+DATABASE_URL = f"postgresql://{username}:{encoded_password}@{host}:{port}/{database}"
+DB_SCHEMA = schema
 
 # Create engine
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)

@@ -9,4 +9,16 @@ services:
       - key: LLM_PROVIDER
         value: gemini
       - key: PYTHON_VERSION
-        value: 3.9.16 
+        value: 3.9.16
+      - key: DB_USERNAME
+        value: postgres.gestigjpiefkwstawvzx
+      - key: DB_PASSWORD
+        value: IntelliAudit$2025
+      - key: DB_HOST
+        value: aws-0-us-east-2.pooler.supabase.com
+      - key: DB_PORT
+        value: 6543
+      - key: DB_NAME
+        value: postgres
+      - key: DB_SCHEMA
+        value: intelliaudit_dev 
