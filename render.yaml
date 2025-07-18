@@ -9,7 +9,7 @@ services:
       - key: LLM_PROVIDER
         value: gemini
       - key: PYTHON_VERSION
-        value: 3.9.16
+        value: 3.11.7
       - key: DB_USERNAME
         value: postgres.gestigjpiefkwstawvzx
       - key: DB_PASSWORD
