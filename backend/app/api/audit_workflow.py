@@ -4,11 +4,25 @@ from pydantic import BaseModel, Field
 from datetime import datetime, date
 from uuid import uuid4, UUID
 import json
+import uuid
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.config.database import get_db
 
 router = APIRouter(tags=["audit-workflow"])
+
+# Helper to convert row to dict with UUIDs as strings
+def row_to_dict(row, columns):
+    d = {}
+    for i, col in enumerate(columns):
+        value = row[i]
+        if hasattr(value, 'isoformat'):
+            d[col] = value.isoformat()
+        elif isinstance(value, uuid.UUID):
+            d[col] = str(value)
+        else:
+            d[col] = value
+    return d
 
 # Pydantic Models matching the exact database schema
 
@@ -168,38 +182,33 @@ async def get_audit_frameworks(db: Session = Depends(get_db)):
             GROUP BY f.id, f.name, f.version
             ORDER BY f.name
         """))
-        
         frameworks = []
+        columns = [desc[0] for desc in result.cursor.description]
         for row in result:
-            # Convert audit_areas from JSON to list, handling null values
-            audit_areas = row.audit_areas if row.audit_areas and row.audit_areas != [None] else []
-            
-            framework_data = {
-                "id": row.id,
-                "name": row.name,
-                "version": row.version,
-                "audit_areas": audit_areas
-            }
-            frameworks.append(framework_data)
-        
+            row_dict = row_to_dict(row, columns)
+            # Convert audit_areas UUIDs to strings in nested list
+            audit_areas = row_dict.get('audit_areas', [])
+            if isinstance(audit_areas, list):
+                for area in audit_areas:
+                    for k, v in area.items():
+                        if isinstance(v, uuid.UUID):
+                            area[k] = str(v)
+            row_dict['audit_areas'] = audit_areas
+            frameworks.append(row_dict)
         return frameworks
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch audit frameworks: {str(e)}")
 
-@router.get("/areas", response_model=List[AuditArea])
+@router.get("/areas", response_model=List[Dict[str, Any]])
 async def get_audit_areas(db: Session = Depends(get_db)):
     """Get all audit areas"""
     try:
         result = db.execute(text("SELECT id, audit_framework_id, name, description, created_at FROM metadata_audit_areas ORDER BY name"))
         areas = []
+        columns = [desc[0] for desc in result.cursor.description]
         for row in result:
-            areas.append(AuditArea(
-                id=row.id,
-                audit_framework_id=row.audit_framework_id,
-                name=row.name,
-                description=row.description,
-                created_at=row.created_at
-            ))
+            area_dict = row_to_dict(row, columns)
+            areas.append(area_dict)
         return areas
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch audit areas: {str(e)}")
@@ -271,38 +280,20 @@ async def create_audit_request(audit: AuditRequest, db: Session = Depends(get_db
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to create audit request: {str(e)}")
 
-@router.get("/audits", response_model=List[AuditRequest])
+@router.get("/audits", response_model=List[Dict[str, Any]])
 async def get_audit_requests(db: Session = Depends(get_db)):
     """Get all audit requests"""
     try:
         result = db.execute(text("SELECT * FROM audit_requests ORDER BY created_at DESC"))
         audits = []
+        columns = [desc[0] for desc in result.cursor.description]
         for row in result:
-            audits.append(AuditRequest(
-                id=row.id,
-                audit_name=row.audit_name,
-                audit_type=row.audit_type,
-                framework_version=row.framework_version,
-                audit_areas=row.audit_areas if row.audit_areas else [],
-                checklist=json.loads(row.checklist) if row.checklist else None,
-                status=row.status,
-                current_step=row.current_step,
-                started_at=row.started_at,
-                last_active_at=row.last_active_at,
-                completed_at=row.completed_at,
-                due_date=row.due_date,
-                description=row.description,
-                compliance_score=row.compliance_score,
-                risk_assessment=row.risk_assessment,
-                final_comments=row.final_comments,
-                created_by=row.created_by,
-                created_at=row.created_at
-            ))
+            audits.append(row_to_dict(row, columns))
         return audits
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch audit requests: {str(e)}")
 
-@router.get("/audits/{audit_id}", response_model=AuditRequest)
+@router.get("/audits/{audit_id}", response_model=Dict[str, Any])
 async def get_audit_request(audit_id: UUID, db: Session = Depends(get_db)):
     """Get a specific audit request"""
     try:
@@ -312,26 +303,8 @@ async def get_audit_request(audit_id: UUID, db: Session = Depends(get_db)):
         if not row:
             raise HTTPException(status_code=404, detail="Audit request not found")
         
-        return AuditRequest(
-            id=row.id,
-            audit_name=row.audit_name,
-            audit_type=row.audit_type,
-            framework_version=row.framework_version,
-            audit_areas=row.audit_areas if row.audit_areas else [],
-            checklist=json.loads(row.checklist) if row.checklist else None,
-            status=row.status,
-            current_step=row.current_step,
-            started_at=row.started_at,
-            last_active_at=row.last_active_at,
-            completed_at=row.completed_at,
-            due_date=row.due_date,
-            description=row.description,
-            compliance_score=row.compliance_score,
-            risk_assessment=row.risk_assessment,
-            final_comments=row.final_comments,
-            created_by=row.created_by,
-            created_at=row.created_at
-        )
+        columns = [desc[0] for desc in result.cursor.description]
+        return row_to_dict(row, columns)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch audit request: {str(e)}")
 
@@ -390,28 +363,15 @@ async def create_document(document: Document, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to create document: {str(e)}")
 
-@router.get("/audits/{audit_id}/documents", response_model=List[Document])
+@router.get("/audits/{audit_id}/documents", response_model=List[Dict[str, Any]])
 async def get_audit_documents(audit_id: UUID, db: Session = Depends(get_db)):
     """Get all documents for an audit request"""
     try:
         result = db.execute(text("SELECT * FROM documents WHERE audit_id = :audit_id ORDER BY uploaded_at DESC"), {"audit_id": str(audit_id)})
         documents = []
+        columns = [desc[0] for desc in result.cursor.description]
         for row in result:
-            documents.append(Document(
-                id=row.id,
-                audit_id=row.audit_id,
-                name=row.name,
-                file_path=row.file_path,
-                file_type=row.file_type,
-                file_size_kb=row.file_size_kb,
-                doc_type=row.doc_type,
-                audit_area=row.audit_area,
-                upload_source=row.upload_source,
-                status=row.status,
-                ai_classification=json.loads(row.ai_classification) if row.ai_classification else None,
-                uploaded_by=row.uploaded_by,
-                uploaded_at=row.uploaded_at
-            ))
+            documents.append(row_to_dict(row, columns))
         return documents
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch documents: {str(e)}")
@@ -475,29 +435,15 @@ async def create_evidence(evidence: Evidence, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to create evidence: {str(e)}")
 
-@router.get("/audits/{audit_id}/evidence", response_model=List[Evidence])
+@router.get("/audits/{audit_id}/evidence", response_model=List[Dict[str, Any]])
 async def get_audit_evidence(audit_id: UUID, db: Session = Depends(get_db)):
     """Get all evidence for an audit request"""
     try:
         result = db.execute(text("SELECT * FROM evidence WHERE audit_id = :audit_id ORDER BY created_at DESC"), {"audit_id": str(audit_id)})
         evidence_list = []
+        columns = [desc[0] for desc in result.cursor.description]
         for row in result:
-            evidence_list.append(Evidence(
-                id=row.id,
-                audit_id=row.audit_id,
-                document_id=row.document_id,
-                audit_area=row.audit_area,
-                checklist_item=row.checklist_item,
-                definition=row.definition,
-                page_number=row.page_number,
-                extracted_text=row.extracted_text,
-                ai_explanation=json.loads(row.ai_explanation) if row.ai_explanation else None,
-                confidence_score=row.confidence_score,
-                reviewed_by=row.reviewed_by,
-                review_status=row.review_status,
-                reviewed_at=row.reviewed_at,
-                created_at=row.created_at
-            ))
+            evidence_list.append(row_to_dict(row, columns))
         return evidence_list
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch evidence: {str(e)}")
@@ -547,23 +493,15 @@ async def create_finding(finding: AuditFinding, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to create finding: {str(e)}")
 
-@router.get("/audits/{audit_id}/findings", response_model=List[AuditFinding])
+@router.get("/audits/{audit_id}/findings", response_model=List[Dict[str, Any]])
 async def get_audit_findings(audit_id: UUID, db: Session = Depends(get_db)):
     """Get all findings for an audit request"""
     try:
         result = db.execute(text("SELECT * FROM audit_findings WHERE audit_id = :audit_id ORDER BY created_at DESC"), {"audit_id": str(audit_id)})
         findings = []
+        columns = [desc[0] for desc in result.cursor.description]
         for row in result:
-            findings.append(AuditFinding(
-                id=row.id,
-                audit_id=row.audit_id,
-                finding_type=row.finding_type,
-                description=row.description,
-                ai_suggestion=row.ai_suggestion,
-                reviewed_by=row.reviewed_by,
-                resolved=row.resolved,
-                created_at=row.created_at
-            ))
+            findings.append(row_to_dict(row, columns))
         return findings
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch findings: {str(e)}")
@@ -609,22 +547,15 @@ async def create_report(report: Report, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to create report: {str(e)}")
 
-@router.get("/audits/{audit_id}/reports", response_model=List[Report])
+@router.get("/audits/{audit_id}/reports", response_model=List[Dict[str, Any]])
 async def get_audit_reports(audit_id: UUID, db: Session = Depends(get_db)):
     """Get all reports for an audit request"""
     try:
         result = db.execute(text("SELECT * FROM reports WHERE audit_id = :audit_id ORDER BY created_at DESC"), {"audit_id": str(audit_id)})
         reports = []
+        columns = [desc[0] for desc in result.cursor.description]
         for row in result:
-            reports.append(Report(
-                id=row.id,
-                audit_id=row.audit_id,
-                report_type=row.report_type,
-                file_path=row.file_path,
-                generated_by=row.generated_by,
-                references=json.loads(row.references) if row.references else None,
-                created_at=row.created_at
-            ))
+            reports.append(row_to_dict(row, columns))
         return reports
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch reports: {str(e)}")
@@ -674,23 +605,15 @@ async def create_audit_log(log: AuditLog, db: Session = Depends(get_db)):
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to create audit log: {str(e)}")
 
-@router.get("/audits/{audit_id}/logs", response_model=List[AuditLog])
+@router.get("/audits/{audit_id}/logs", response_model=List[Dict[str, Any]])
 async def get_audit_logs(audit_id: UUID, db: Session = Depends(get_db)):
     """Get all logs for an audit request"""
     try:
         result = db.execute(text("SELECT * FROM audit_logs WHERE related_id = :audit_id ORDER BY created_at DESC"), {"audit_id": str(audit_id)})
         logs = []
+        columns = [desc[0] for desc in result.cursor.description]
         for row in result:
-            logs.append(AuditLog(
-                id=row.id,
-                related_type=row.related_type,
-                related_id=row.related_id,
-                action=row.action,
-                performed_by=row.performed_by,
-                is_ai_action=row.is_ai_action,
-                ai_details=json.loads(row.ai_details) if row.ai_details else None,
-                created_at=row.created_at
-            ))
+            logs.append(row_to_dict(row, columns))
         return logs
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch audit logs: {str(e)}")
@@ -750,27 +673,15 @@ async def create_progress(progress: AuditProgress, db: Session = Depends(get_db)
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to create progress: {str(e)}")
 
-@router.get("/audits/{audit_id}/progress", response_model=List[AuditProgress])
+@router.get("/audits/{audit_id}/progress", response_model=List[Dict[str, Any]])
 async def get_audit_progress(audit_id: UUID, db: Session = Depends(get_db)):
     """Get progress for an audit request"""
     try:
         result = db.execute(text("SELECT * FROM audit_progress WHERE audit_id = :audit_id ORDER BY updated_at DESC"), {"audit_id": str(audit_id)})
         progress_list = []
+        columns = [desc[0] for desc in result.cursor.description]
         for row in result:
-            progress_list.append(AuditProgress(
-                id=row.id,
-                audit_id=row.audit_id,
-                user_id=row.user_id,
-                document_id=row.document_id,
-                current_step=row.current_step,
-                status=row.status,
-                started_at=row.started_at,
-                resumed_at=row.resumed_at,
-                completed_at=row.completed_at,
-                time_spent_seconds=row.time_spent_seconds,
-                metadata=json.loads(row.metadata) if row.metadata else None,
-                updated_at=row.updated_at
-            ))
+            progress_list.append(row_to_dict(row, columns))
         return progress_list
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch progress: {str(e)}") 

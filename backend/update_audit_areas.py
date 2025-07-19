@@ -8,6 +8,7 @@ import os
 from urllib.parse import quote_plus
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
+import uuid
 
 # Add the app directory to the Python path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'app'))
@@ -85,6 +86,8 @@ def update_audit_areas():
                     # Convert datetime objects to string for JSON serialization
                     if hasattr(value, 'isoformat'):
                         row_dict[column] = value.isoformat()
+                    elif isinstance(value, uuid.UUID):
+                        row_dict[column] = str(value)
                     else:
                         row_dict[column] = value
                 rows.append(row_dict)
