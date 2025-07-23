@@ -3,11 +3,13 @@ from typing import List, Optional, Dict, Any
 from pydantic import BaseModel, Field
 from datetime import datetime, date
 from uuid import uuid4, UUID
+import psycopg
 import json
 import uuid
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from app.config.database import get_db
+from app.config.database_simple import get_db_connection
 
 router = APIRouter(tags=["audit-workflow"])
 
@@ -40,10 +42,9 @@ class AuditArea(BaseModel):
     created_at: Optional[datetime] = None
 
 class AuditRequest(BaseModel):
-    id: Optional[UUID] = None
+    audit_request_id: Optional[UUID] = None
     audit_name: str
-    audit_type: str
-    framework_version: Optional[str] = None
+    framework_id: str
     audit_areas: List[str] = []
     checklist: Optional[Dict[str, Any]] = None
     status: str = "not_started"
@@ -58,6 +59,10 @@ class AuditRequest(BaseModel):
     final_comments: Optional[str] = None
     created_by: Optional[UUID] = None
     created_at: Optional[datetime] = None
+
+class AuditRequestResponse(BaseModel):
+    audit_request_id: UUID
+    audit_name: str
 
 class Document(BaseModel):
     id: Optional[UUID] = None
@@ -162,40 +167,97 @@ class UserActivityLog(BaseModel):
 # API Endpoints
 
 @router.get("/frameworks", response_model=List[Dict[str, Any]])
-async def get_audit_frameworks(db: Session = Depends(get_db)):
+# async def get_audit_frameworks(db: Session = Depends(get_db)):
+#     """Get all audit frameworks with their related audit areas"""
+#     try:
+#         result = db.execute(text("""
+#             SELECT 
+#                 f.id,
+#                 f.name,
+#                 f.version,
+#                 json_agg(
+#                     json_build_object(
+#                         'id', aa.id,
+#                         'name', aa.name,
+#                         'description', aa.description
+#                     )
+#                 ) as audit_areas
+#             FROM metadata_audit_frameworks f
+#             LEFT JOIN metadata_audit_areas aa ON f.id = aa.audit_framework_id
+#             GROUP BY f.id, f.name, f.version
+#             ORDER BY f.name
+#         """))
+#         frameworks = []
+#         columns = [desc[0] for desc in result.cursor.description]
+#         for row in result:
+#             row_dict = row_to_dict(row, columns)
+#             # Convert audit_areas UUIDs to strings in nested list
+#             audit_areas = row_dict.get('audit_areas', [])
+#             if isinstance(audit_areas, list):
+#                 for area in audit_areas:
+#                     for k, v in area.items():
+#                         if isinstance(v, uuid.UUID):
+#                             area[k] = str(v)
+#             row_dict['audit_areas'] = audit_areas
+#             frameworks.append(row_dict)
+#         return frameworks
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"Failed to fetch audit frameworks: {str(e)}")
+async def get_audit_frameworks():
     """Get all audit frameworks with their related audit areas"""
     try:
-        result = db.execute(text("""
-            SELECT 
-                f.id,
-                f.name,
-                f.version,
-                json_agg(
-                    json_build_object(
-                        'id', aa.id,
-                        'name', aa.name,
-                        'description', aa.description
-                    )
-                ) as audit_areas
-            FROM metadata_audit_frameworks f
-            LEFT JOIN metadata_audit_areas aa ON f.id = aa.audit_framework_id
-            GROUP BY f.id, f.name, f.version
-            ORDER BY f.name
-        """))
-        frameworks = []
-        columns = [desc[0] for desc in result.cursor.description]
-        for row in result:
-            row_dict = row_to_dict(row, columns)
-            # Convert audit_areas UUIDs to strings in nested list
-            audit_areas = row_dict.get('audit_areas', [])
-            if isinstance(audit_areas, list):
-                for area in audit_areas:
-                    for k, v in area.items():
-                        if isinstance(v, uuid.UUID):
-                            area[k] = str(v)
-            row_dict['audit_areas'] = audit_areas
-            frameworks.append(row_dict)
-        return frameworks
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    SELECT 
+                        f.framework_id,
+                        f.name,
+                        f.version,
+                        f.created_at,
+                        f.updated_at,
+                        f.created_by,
+                        f.updated_by,
+                        json_agg(
+                            json_build_object(
+                                'audit_area_id', aa.audit_area_id,
+                                'framework_id', aa.framework_id,
+                                'name', aa.name,
+                                'description', aa.description,
+                                'created_at', aa.created_at,
+                                'updated_at', aa.updated_at,
+                                'created_by', aa.created_by,
+                                'updated_by', aa.updated_by
+                            )
+                        ) FILTER (WHERE aa.audit_area_id IS NOT NULL) as audit_areas
+                    FROM intelliaudit_dev.metadata_audit_frameworks f
+                    LEFT JOIN intelliaudit_dev.metadata_audit_areas aa ON f.framework_id = aa.framework_id
+                    GROUP BY f.framework_id, f.name, f.version, f.created_at, f.updated_at, f.created_by, f.updated_by
+                    ORDER BY f.name
+                """)
+                frameworks = []
+                for row in cursor.fetchall():
+                    # Convert audit_areas UUIDs to strings
+                    audit_areas = row[7] if row[7] and row[7] != [None] else []
+                    if isinstance(audit_areas, list):
+                        for area in audit_areas:
+                            for k, v in area.items():
+                                if isinstance(v, uuid.UUID):
+                                    area[k] = str(v)
+                    framework_data = {
+                        "framework_id": str(row[0]) if isinstance(row[0], uuid.UUID) else row[0],
+                        "name": row[1],
+                        "version": row[2],
+                        "created_at": row[3].isoformat() if hasattr(row[3], 'isoformat') else row[3],
+                        "updated_at": row[4].isoformat() if hasattr(row[4], 'isoformat') else row[4],
+                        "created_by": str(row[5]) if isinstance(row[5], uuid.UUID) else row[5],
+                        "updated_by": str(row[6]) if isinstance(row[6], uuid.UUID) else row[6],
+                        "audit_areas": audit_areas
+                    }
+                    frameworks.append(framework_data)
+                return frameworks
+        finally:
+            conn.close()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch audit frameworks: {str(e)}")
 
@@ -213,71 +275,101 @@ async def get_audit_areas(db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch audit areas: {str(e)}")
 
-@router.post("/audits", response_model=AuditRequest)
-async def create_audit_request(audit: AuditRequest, db: Session = Depends(get_db)):
-    """Create a new audit request"""
+# @router.post("/audits", response_model=AuditRequest)
+# async def create_audit_request(audit: AuditRequest, db: Session = Depends(get_db)):
+#     """Create a new audit request"""
+#     try:
+#         audit_id = uuid4()
+#         now = datetime.utcnow()
+#         conn = get_db_connection()
+        
+#         # query = text("""
+#         #     INSERT INTO audit_requests (
+#         #         id, audit_name, audit_type, framework_version, audit_areas, checklist,
+#         #         status, current_step, started_at, last_active_at, completed_at, due_date,
+#         #         description, compliance_score, risk_assessment, final_comments, created_by, created_at
+#         #     ) VALUES (
+#         #         :id, :audit_name, :audit_type, :framework_version, :audit_areas, :checklist,
+#         #         :status, :current_step, :started_at, :last_active_at, :completed_at, :due_date,
+#         #         :description, :compliance_score, :risk_assessment, :final_comments, :created_by, :created_at
+#         #     ) RETURNING *
+#         # """)
+#         query = text("""
+#             INSERT INTO audit_requests (
+#                 id, audit_name, framework_id, audit_areas,
+#                 status, current_step, started_at, last_active_at, created_by, created_at
+#             ) VALUES (
+#                 :id, :audit_name, :framework_id, :audit_areas,
+#                 :status, :current_step, :started_at, :last_active_at, :created_by, :created_at
+#             ) RETURNING *
+#         """)
+        
+#         result = db.execute(query, {
+#             "id": str(audit_id),
+#             "audit_name": audit.audit_name,
+#             "framework_id": audit.framework_id,
+#             "audit_areas": audit.audit_areas,
+#             "status": audit.status,
+#             "current_step": audit.current_step,
+#             "started_at": now,
+#             "last_active_at": now,
+#             "created_by": str(audit.created_by) if audit.created_by else None,
+#             "created_at": now
+#         })
+        
+#         db.commit()
+#         row = result.fetchone()
+        
+#         return AuditRequest(
+#             id=row.id,
+#             audit_name=row.audit_name
+#         )
+#     except Exception as e:
+#         db.rollback()
+#         raise HTTPException(status_code=500, detail=f"Failed to create audit request: {str(e)}")
+
+@router.post("/audits", response_model=AuditRequestResponse)
+async def create_audit_request(audit: AuditRequest):
+    """Create a new audit request using psycopg2"""
     try:
-        audit_id = uuid4()
+        audit_request_id = uuid4()
         now = datetime.utcnow()
-        
-        query = text("""
-            INSERT INTO audit_requests (
-                id, audit_name, audit_type, framework_version, audit_areas, checklist,
-                status, current_step, started_at, last_active_at, completed_at, due_date,
-                description, compliance_score, risk_assessment, final_comments, created_by, created_at
-            ) VALUES (
-                :id, :audit_name, :audit_type, :framework_version, :audit_areas, :checklist,
-                :status, :current_step, :started_at, :last_active_at, :completed_at, :due_date,
-                :description, :compliance_score, :risk_assessment, :final_comments, :created_by, :created_at
-            ) RETURNING *
-        """)
-        
-        result = db.execute(query, {
-            "id": str(audit_id),
-            "audit_name": audit.audit_name,
-            "audit_type": audit.audit_type,
-            "framework_version": audit.framework_version,
-            "audit_areas": audit.audit_areas,
-            "checklist": json.dumps(audit.checklist) if audit.checklist else None,
-            "status": audit.status,
-            "current_step": audit.current_step,
-            "started_at": audit.started_at,
-            "last_active_at": audit.last_active_at,
-            "completed_at": audit.completed_at,
-            "due_date": audit.due_date,
-            "description": audit.description,
-            "compliance_score": audit.compliance_score,
-            "risk_assessment": audit.risk_assessment,
-            "final_comments": audit.final_comments,
-            "created_by": str(audit.created_by) if audit.created_by else None,
-            "created_at": now
-        })
-        
-        db.commit()
-        row = result.fetchone()
-        
-        return AuditRequest(
-            id=row.id,
-            audit_name=row.audit_name,
-            audit_type=row.audit_type,
-            framework_version=row.framework_version,
-            audit_areas=row.audit_areas if row.audit_areas else [],
-            checklist=json.loads(row.checklist) if row.checklist else None,
-            status=row.status,
-            current_step=row.current_step,
-            started_at=row.started_at,
-            last_active_at=row.last_active_at,
-            completed_at=row.completed_at,
-            due_date=row.due_date,
-            description=row.description,
-            compliance_score=row.compliance_score,
-            risk_assessment=row.risk_assessment,
-            final_comments=row.final_comments,
-            created_by=row.created_by,
-            created_at=row.created_at
-        )
+
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO intelliaudit_dev.audit_requests (
+                        audit_request_id, audit_name, framework_id, audit_areas,
+                        status, current_step, started_at, last_active_at, created_at
+                    ) VALUES (
+                        %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s
+                    ) RETURNING audit_request_id, audit_name
+                """, (
+                    str(audit_request_id),
+                    audit.audit_name,
+                    str(audit.framework_id) if audit.framework_id else None,
+                    audit.audit_areas,  # Should be a list or JSON-serializable
+                    audit.status,
+                    audit.current_step,
+                    now,
+                    now,
+                    now
+                ))
+
+                row = cursor.fetchone()
+                conn.commit()
+
+                return {
+                    "audit_request_id": str(row[0]),
+                    "audit_name": row[1]
+                }
+
+        finally:
+            conn.close()
+
     except Exception as e:
-        db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to create audit request: {str(e)}")
 
 @router.get("/audits", response_model=List[Dict[str, Any]])
