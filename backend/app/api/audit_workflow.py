@@ -64,20 +64,17 @@ class AuditRequestResponse(BaseModel):
     audit_request_id: UUID
     audit_name: str
 
-class Document(BaseModel):
-    id: Optional[UUID] = None
-    audit_id: UUID
+class DocumentRequest(BaseModel):
+    audit_request_id: UUID
     name: str
-    file_path: Optional[str] = None
-    file_type: Optional[str] = None
-    file_size_kb: Optional[float] = None
-    doc_type: Optional[str] = None
-    audit_area: Optional[str] = None
-    upload_source: str = "manual"
-    status: str = "pending"
-    ai_classification: Optional[Dict[str, Any]] = None
-    uploaded_by: Optional[UUID] = None
-    uploaded_at: Optional[datetime] = None
+    file_type: str
+    file_size_kb: float
+    upload_source: str
+    status: str
+
+class DocumentRequestResponse(BaseModel):
+    document_id: UUID
+    name: str
 
 class DocumentCollaborator(BaseModel):
     id: Optional[UUID] = None
@@ -334,7 +331,6 @@ async def create_audit_request(audit: AuditRequest):
     try:
         audit_request_id = uuid4()
         now = datetime.utcnow()
-
         conn = get_db_connection()
         try:
             with conn.cursor() as cursor:
@@ -400,60 +396,49 @@ async def get_audit_request(audit_id: UUID, db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to fetch audit request: {str(e)}")
 
-@router.post("/documents", response_model=Document)
-async def create_document(document: Document, db: Session = Depends(get_db)):
+@router.post("/documents", response_model=DocumentRequestResponse)
+async def create_document(document: DocumentRequest):
     """Create a new document record"""
     try:
-        doc_id = uuid4()
+        document_id = uuid4()
         now = datetime.utcnow()
-        
-        query = text("""
-            INSERT INTO documents (
-                id, audit_id, name, file_path, file_type, file_size_kb, doc_type,
-                audit_area, upload_source, status, ai_classification, uploaded_by, uploaded_at
-            ) VALUES (
-                :id, :audit_id, :name, :file_path, :file_type, :file_size_kb, :doc_type,
-                :audit_area, :upload_source, :status, :ai_classification, :uploaded_by, :uploaded_at
-            ) RETURNING *
-        """)
-        
-        result = db.execute(query, {
-            "id": str(doc_id),
-            "audit_id": str(document.audit_id),
-            "name": document.name,
-            "file_path": document.file_path,
-            "file_type": document.file_type,
-            "file_size_kb": document.file_size_kb,
-            "doc_type": document.doc_type,
-            "audit_area": document.audit_area,
-            "upload_source": document.upload_source,
-            "status": document.status,
-            "ai_classification": json.dumps(document.ai_classification) if document.ai_classification else None,
-            "uploaded_by": str(document.uploaded_by) if document.uploaded_by else None,
-            "uploaded_at": now
-        })
-        
-        db.commit()
-        row = result.fetchone()
-        
-        return Document(
-            id=row.id,
-            audit_id=row.audit_id,
-            name=row.name,
-            file_path=row.file_path,
-            file_type=row.file_type,
-            file_size_kb=row.file_size_kb,
-            doc_type=row.doc_type,
-            audit_area=row.audit_area,
-            upload_source=row.upload_source,
-            status=row.status,
-            ai_classification=json.loads(row.ai_classification) if row.ai_classification else None,
-            uploaded_by=row.uploaded_by,
-            uploaded_at=row.uploaded_at
-        )
+        conn = get_db_connection()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                    INSERT INTO documents (
+                        document_id, audit_request_id, name, file_type, file_size_kb,
+                        upload_source, status, updated_at, created_at
+                    ) VALUES (
+                        %s, %s, %s, %s,
+                        %s, %s, %s, %s, %s
+                    ) RETURNING document_id, name
+                """, (
+                    str(document_id),
+                    str(document.audit_request_id),
+                    document.name,
+                    document.file_type,
+                    document.file_size_kb,
+                    document.upload_source,
+                    document.status,
+                    now,
+                    now
+                ))
+
+                row = cursor.fetchone()
+                conn.commit()
+
+                return {
+                    "document_id": str(row[0]),
+                    "name": row[1]
+                }
+
+        finally:
+            conn.close()
+
     except Exception as e:
-        db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to create document: {str(e)}")
+        
 
 @router.get("/audits/{audit_id}/documents", response_model=List[Dict[str, Any]])
 async def get_audit_documents(audit_id: UUID, db: Session = Depends(get_db)):
