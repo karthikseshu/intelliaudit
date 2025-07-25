@@ -541,7 +541,8 @@ async def create_evidence(evidence: Evidence, db: Session = Depends(get_db)):
 
 def insert_evidence_from_audit_results(results: list, audit_request_id: str, document_id: str):
     """
-    Inserts audit result evidence rows into intelliaudit_dev.evidence table.
+    Deletes old records and inserts new audit result evidence rows 
+    into intelliaudit_dev.evidence table.
     
     :param results: Output from run_audit_on_text_by_page (list of dicts)
     :param audit_request_id: UUID of the audit request
@@ -552,6 +553,13 @@ def insert_evidence_from_audit_results(results: list, audit_request_id: str, doc
         now = datetime.utcnow()
 
         with conn.cursor() as cursor:
+            # First delete existing records for this audit request and document
+            cursor.execute("""
+                DELETE FROM intelliaudit_dev.evidence
+                WHERE audit_request_id = %s AND document_id = %s
+            """, (str(audit_request_id), str(document_id)))
+
+            # Now insert the new evidence records
             for result in results:
                 evidence_id = uuid4()
                 criteria_json = {
@@ -563,13 +571,13 @@ def insert_evidence_from_audit_results(results: list, audit_request_id: str, doc
                     INSERT INTO intelliaudit_dev.evidence (
                         evidence_id, audit_request_id, document_id,
                         criteria, page_number, extracted_text,
-                        ai_explanation, confidence_score, review_status,
+                        ai_explanation, confidence_score, review_status, remarks, risk_level,
                         created_at, updated_at
                     ) VALUES (
                         %s, %s, %s,
                         %s, %s, %s,
                         %s, %s, %s,
-                        %s, %s
+                        %s, %s, %s, %s
                     )
                 """, (
                     str(evidence_id),
@@ -581,6 +589,8 @@ def insert_evidence_from_audit_results(results: list, audit_request_id: str, doc
                     json.dumps(result.get("explanation")),
                     result.get("compliance_score", 0),
                     "pending",
+                    result.get("remarks", ""),
+                    result.get("risk_level", ""),
                     now,
                     now
                 ))
@@ -591,6 +601,56 @@ def insert_evidence_from_audit_results(results: list, audit_request_id: str, doc
         raise HTTPException(status_code=500, detail=f"Failed to insert evidence records: {str(e)}")
     finally:
         conn.close()
+
+def get_evidence_results_by_audit_and_document(audit_request_id: str, document_id: str) -> list:
+    """
+    Fetches inserted evidence records for a given audit_request_id and document_id,
+    returning them in the format similar to the audit results, with evidence_id included.
+    """
+    try:
+        conn = get_db_connection()
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT 
+                    evidence_id,
+                    criteria,
+                    page_number,
+                    extracted_text,
+                    ai_explanation,
+                    confidence_score,
+                    review_status,
+                    risk_level,
+                    remarks
+                FROM intelliaudit_dev.evidence
+                WHERE audit_request_id = %s AND document_id = %s
+                ORDER BY created_at
+            """, (str(audit_request_id), str(document_id)))
+
+            rows = cursor.fetchall()
+
+            results = []
+            for row in rows:
+                results.append({
+                    "evidence_id": str(row[0]),
+                    "criteria": row[1].get("criteria"),
+                    "category": row[1].get("category"),
+                    "factor": row[1].get("factor", ""),
+                    "page": row[2],
+                    "evidence": row[3],
+                    "explanation": row[4],  # Already JSON from DB
+                    "compliance_score": float(row[5]) if row[5] is not None else 0,
+                    "review_status": row[6],
+                    "risk_level": row[7],   # From DB
+                    "remarks": row[8]      # From DB
+                })
+
+            return results
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch evidence records: {str(e)}")
+    finally:
+        conn.close()
+
 
 @router.get("/audits/{audit_id}/evidence", response_model=List[Dict[str, Any]])
 async def get_audit_evidence(audit_id: UUID, db: Session = Depends(get_db)):
