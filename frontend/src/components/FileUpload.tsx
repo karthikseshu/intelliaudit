@@ -21,7 +21,7 @@ const FileUpload: React.FC<FileUploadProps> = ({ onUpload }) => {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      const res = await fetch(`${config.API.AUDIT}/upload`, {
+      const res = await fetch(`${config.API.AUDIT}/uploadandaudit`, {
         method: 'POST',
         body: formData,
       });
