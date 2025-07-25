@@ -171,3 +171,57 @@ def run_audit_on_text(text: str, model: str = None, provider: str = None):
             "page": None  # Page extraction not implemented in LLM mode
         })
     return results 
+
+def run_audit_on_text_by_page(pages: list[dict[str, str]], model: str = None, provider: str = None):
+    criteria = load_criteria()
+    results = []
+
+    for page in pages:
+        page_number = page["page"]
+        page_text = page["text"]
+
+        for c in criteria:
+            if 'compliance_requirements' in c:
+                prompt = create_ncqa_audit_prompt(c, page_text)
+            else:
+                prompt = (
+                    f"Audit the following document page for this criterion: '{c['criteria']}'. "
+                    f"Category: {c['category']}. "
+                    f"Description: {c['description']}.\n"
+                    f"Document (Page {page_number}):\n{page_text}\n"
+                    "Respond in JSON format with keys: 'found' (true/false), 'evidence', 'explanation', 'remarks'."
+                )
+
+            try:
+                llm_response = query_llm(prompt, model, 0.1, provider)
+                parsed = extract_json_from_response(llm_response)
+
+                found = parsed.get('found', False) if isinstance(parsed, dict) else False
+                evidence = parsed.get('evidence', '') if isinstance(parsed, dict) else ''
+                explanation = parsed.get('explanation', '') if isinstance(parsed, dict) else f"LLM response could not be parsed: {llm_response[:200]}..."
+                remarks = parsed.get('remarks', '') if isinstance(parsed, dict) else ''
+                compliance_score = parsed.get('compliance_score', 0) if isinstance(parsed, dict) else 0
+                risk_level = parsed.get('risk_level', 'Unknown') if isinstance(parsed, dict) else 'Unknown'
+
+            except Exception as e:
+                found = False
+                evidence = ''
+                explanation = f"LLM error: {str(e)}"
+                remarks = ''
+                compliance_score = 0
+                risk_level = 'Unknown'
+
+            results.append({
+                "criteria": c["criteria"],
+                "category": c["category"],
+                "factor": c.get("factor", ""),
+                "evidence": evidence,
+                "explanation": explanation,
+                "remarks": remarks,
+                "compliance_score": compliance_score,
+                "risk_level": risk_level,
+                "page": page_number
+            })
+
+    return results
+

@@ -368,6 +368,33 @@ async def create_audit_request(audit: AuditRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to create audit request: {str(e)}")
 
+
+async def update_audit_request(audit_request_id: str, status: str, current_step: str):
+    """Update an audit request and return 'Success' on success"""
+    try:
+        conn = get_db_connection()
+        now = datetime.utcnow()
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("""
+                UPDATE intelliaudit_dev.audit_requests
+                SET status = %s, current_step = %s, started_at = %s, last_active_at = %s, updated_at = %s
+                WHERE audit_request_id = %s
+            """, (
+                status,
+                current_step,
+                now,
+                now,
+                now,
+                audit_request_id
+            ))
+                conn.commit()
+        finally:
+            conn.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to update audit request: {str(e)}")
+
+
 @router.get("/audits", response_model=List[Dict[str, Any]])
 async def get_audit_requests(db: Session = Depends(get_db)):
     """Get all audit requests"""
@@ -511,6 +538,59 @@ async def create_evidence(evidence: Evidence, db: Session = Depends(get_db)):
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Failed to create evidence: {str(e)}")
+
+def insert_evidence_from_audit_results(results: list, audit_request_id: str, document_id: str):
+    """
+    Inserts audit result evidence rows into intelliaudit_dev.evidence table.
+    
+    :param results: Output from run_audit_on_text_by_page (list of dicts)
+    :param audit_request_id: UUID of the audit request
+    :param document_id: UUID of the document
+    """
+    try:
+        conn = get_db_connection()
+        now = datetime.utcnow()
+
+        with conn.cursor() as cursor:
+            for result in results:
+                evidence_id = uuid4()
+                criteria_json = {
+                    "criteria": result.get("criteria"),
+                    "category": result.get("category"),
+                    "factor": result.get("factor", "")
+                }
+                cursor.execute("""
+                    INSERT INTO intelliaudit_dev.evidence (
+                        evidence_id, audit_request_id, document_id,
+                        criteria, page_number, extracted_text,
+                        ai_explanation, confidence_score, review_status,
+                        created_at, updated_at
+                    ) VALUES (
+                        %s, %s, %s,
+                        %s, %s, %s,
+                        %s, %s, %s,
+                        %s, %s
+                    )
+                """, (
+                    str(evidence_id),
+                    str(audit_request_id),
+                    str(document_id),
+                    json.dumps(criteria_json),
+                    result.get("page"),
+                    result.get("evidence"),
+                    json.dumps(result.get("explanation")),
+                    result.get("compliance_score", 0),
+                    "pending",
+                    now,
+                    now
+                ))
+
+        conn.commit()
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to insert evidence records: {str(e)}")
+    finally:
+        conn.close()
 
 @router.get("/audits/{audit_id}/evidence", response_model=List[Dict[str, Any]])
 async def get_audit_evidence(audit_id: UUID, db: Session = Depends(get_db)):
