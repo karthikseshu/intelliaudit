@@ -901,4 +901,60 @@ async def get_audit_progress(audit_id: UUID, db: Session = Depends(get_db)):
             progress_list.append(row_to_dict(row, columns))
         return progress_list
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to fetch progress: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Failed to fetch progress: {str(e)}")
+
+# New Pydantic model for evidence status update
+class EvidenceStatusUpdate(BaseModel):
+    evidence_id: UUID
+    status: str
+    reviewed_by: Optional[UUID] = None
+
+@router.put("/evidence/{evidence_id}/status")
+async def update_evidence_status(evidence_id: UUID, status_update: EvidenceStatusUpdate):
+    """Update the review status of evidence"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Validate that the evidence exists
+        cursor.execute(
+            "SELECT evidence_id FROM evidence WHERE evidence_id = %s",
+            (str(evidence_id),)
+        )
+        
+        if not cursor.fetchone():
+            conn.close()
+            raise HTTPException(status_code=404, detail="Evidence not found")
+        
+        # Update the evidence status
+        now = datetime.utcnow()
+        cursor.execute(
+            """
+            UPDATE evidence 
+            SET review_status = %s, 
+                reviewed_by = %s, 
+                reviewed_at = %s,
+                updated_at = %s
+            WHERE evidence_id = %s
+            """,
+            (
+                status_update.status,
+                str(status_update.reviewed_by) if status_update.reviewed_by else None,
+                now,
+                now,
+                str(evidence_id)
+            )
+        )
+        
+        conn.commit()
+        conn.close()
+        
+        return {"message": "Success"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if 'conn' in locals():
+            conn.rollback()
+            conn.close()
+        raise HTTPException(status_code=500, detail=f"Failed to update evidence status: {str(e)}") 
