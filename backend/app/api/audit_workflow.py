@@ -559,7 +559,9 @@ def insert_evidence_from_audit_results(results: list, audit_request_id: str, doc
                 WHERE audit_request_id = %s AND document_id = %s
             """, (str(audit_request_id), str(document_id)))
 
-            # Now insert the new evidence records
+            print(f"Inserting {len(results)} evidence records (LLM already filtered for evidence)")
+
+            # Insert all results since LLM only responds when evidence is found
             for result in results:
                 evidence_id = uuid4()
                 criteria_json = {
@@ -909,6 +911,11 @@ class EvidenceStatusUpdate(BaseModel):
     status: str
     reviewed_by: Optional[UUID] = None
 
+# New Pydantic model for evidence annotation update
+class EvidenceAnnotationUpdate(BaseModel):
+    evidence_id: UUID
+    annotation: Dict[str, Any]
+
 @router.put("/evidence/{evidence_id}/status")
 async def update_evidence_status(evidence_id: UUID, status_update: EvidenceStatusUpdate):
     """Update the review status of evidence"""
@@ -957,4 +964,50 @@ async def update_evidence_status(evidence_id: UUID, status_update: EvidenceStatu
         if 'conn' in locals():
             conn.rollback()
             conn.close()
-        raise HTTPException(status_code=500, detail=f"Failed to update evidence status: {str(e)}") 
+        raise HTTPException(status_code=500, detail=f"Failed to update evidence status: {str(e)}")
+
+@router.put("/evidence/{evidence_id}/annotation")
+async def update_evidence_annotation(evidence_id: UUID, annotation_update: EvidenceAnnotationUpdate):
+    """Update the annotation field of evidence"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Validate that the evidence exists
+        cursor.execute(
+            "SELECT evidence_id FROM evidence WHERE evidence_id = %s",
+            (str(evidence_id),)
+        )
+        
+        if not cursor.fetchone():
+            conn.close()
+            raise HTTPException(status_code=404, detail="Evidence not found")
+        
+        # Update the evidence annotation
+        now = datetime.utcnow()
+        cursor.execute(
+            """
+            UPDATE evidence 
+            SET annotation = %s,
+                updated_at = %s
+            WHERE evidence_id = %s
+            """,
+            (
+                json.dumps(annotation_update.annotation),
+                now,
+                str(evidence_id)
+            )
+        )
+        
+        conn.commit()
+        conn.close()
+        
+        return {"message": "Success"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if 'conn' in locals():
+            conn.rollback()
+            conn.close()
+        raise HTTPException(status_code=500, detail=f"Failed to update evidence annotation: {str(e)}") 

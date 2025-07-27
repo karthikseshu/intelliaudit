@@ -1,7 +1,10 @@
 import openai
 import requests
 import google.generativeai as genai
-from app.settings import OPENAI_API_KEY, OPENAI_API_BASE, HUGGINGFACE_API_KEY, GEMINI_API_KEY, LLM_PROVIDER, HUGGINGFACE_DEFAULT_MODEL
+from app.settings import (
+    OPENAI_API_KEY, OPENAI_API_BASE, HUGGINGFACE_API_KEY, GEMINI_API_KEY, 
+    LLM_PROVIDER, HUGGINGFACE_DEFAULT_MODEL, CUSTOM_LLM_ENDPOINT, CUSTOM_LLM_API_KEY
+)
 
 openai.api_key = OPENAI_API_KEY
 openai.base_url = OPENAI_API_BASE
@@ -16,7 +19,65 @@ def query_llm(prompt: str, model: str = None, temperature: float = 0.2, provider
     # Use provided provider or fallback to environment setting
     current_provider = provider or LLM_PROVIDER
     
-    if current_provider == 'openai':
+    if current_provider == 'custom':
+        # Use the custom LLM endpoint
+        print(f"Custom LLM endpoint: {CUSTOM_LLM_ENDPOINT}")  # Debug
+        
+        try:
+            # Prepare headers - include API key if provided
+            headers = {"Content-Type": "application/json"}
+            if CUSTOM_LLM_API_KEY:
+                headers["Authorization"] = f"Bearer {CUSTOM_LLM_API_KEY}"
+            
+            # Prepare payload - adjust based on your endpoint's expected format
+            payload = {
+                "prompt": prompt,
+                "temperature": temperature,
+                "max_tokens": 512
+            }
+            
+            # Add model parameter if provided
+            if model:
+                payload["model"] = model
+            
+            response = requests.post(
+                CUSTOM_LLM_ENDPOINT,
+                headers=headers,
+                json=payload,
+                timeout=60  # Increased timeout for custom endpoint
+            )
+            
+            # Check for HTTP errors
+            if response.status_code != 200:
+                raise Exception(f"Custom LLM API error: HTTP {response.status_code} - {response.text}")
+            
+            # Parse response - adjust based on your endpoint's response format
+            data = response.json()
+            
+            # Handle different response formats
+            if isinstance(data, dict):
+                if 'response' in data:
+                    return data['response'].strip()
+                elif 'text' in data:
+                    return data['text'].strip()
+                elif 'content' in data:
+                    return data['content'].strip()
+                elif 'result' in data:
+                    return data['result'].strip()
+                else:
+                    # If it's a dict but doesn't have expected keys, return the whole thing as string
+                    return str(data).strip()
+            elif isinstance(data, str):
+                return data.strip()
+            else:
+                return str(data).strip()
+                
+        except requests.exceptions.RequestException as e:
+            raise Exception(f"Custom LLM network error: {str(e)}")
+        except Exception as e:
+            raise Exception(f"Custom LLM API error: {str(e)}")
+    
+    elif current_provider == 'openai':
         model = model or "gpt-3.5-turbo"
         print(f"OpenAI base_url: {openai.base_url}, model: {model}")  # Debug
         response = openai.chat.completions.create(

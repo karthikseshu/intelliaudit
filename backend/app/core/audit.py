@@ -61,54 +61,32 @@ def create_ncqa_audit_prompt(criteria_item, text):
     """Create a comprehensive NCQA audit prompt for healthcare compliance"""
     
     prompt = f"""
-You are a healthcare compliance auditor specializing in NCQA (National Committee for Quality Assurance) standards. Your task is to audit a healthcare document against specific NCQA criteria.
+You are a healthcare compliance auditor specializing in NCQA standards. Audit this document against the specific criterion.
 
-CRITERIA DETAILS:
-- ID: {criteria_item.get('id', 'N/A')}
-- Category: {criteria_item.get('category', 'N/A')}
-- Factor: {criteria_item.get('factor', 'N/A')}
-- Criteria: {criteria_item.get('criteria', 'N/A')}
-- Description: {criteria_item.get('description', 'N/A')}
+CRITERIA: {criteria_item.get('criteria', 'N/A')}
+Category: {criteria_item.get('category', 'N/A')}
+Factor: {criteria_item.get('factor', 'N/A')}
 
 COMPLIANCE REQUIREMENTS:
 {chr(10).join([f"- {req}" for req in criteria_item.get('compliance_requirements', [])])}
-
-EVIDENCE REQUIRED:
-{chr(10).join([f"- {evidence}" for evidence in criteria_item.get('evidence_required', [])])}
 
 DOCUMENT TO AUDIT:
 {text}
 
 INSTRUCTIONS:
-1. Carefully analyze the document for evidence of compliance with this NCQA criterion
-2. Look for specific mentions, policies, procedures, or documentation that address the requirements
-3. Consider both explicit statements and implicit evidence that demonstrates compliance
-4. Evaluate the completeness and adequacy of the evidence found
+1. ONLY respond if you find specific evidence supporting this criterion
+2. If no evidence is found, DO NOT respond at all (save tokens)
+3. If evidence is found, respond with ONLY this JSON:
 
-RESPOND IN THIS EXACT JSON FORMAT (no markdown, no code blocks):
 {{
-    "found": true/false,
-    "evidence": "Specific text or evidence found in the document that supports compliance",
-    "explanation": "Detailed explanation of how the evidence demonstrates compliance or why it's insufficient",
-    "remarks": "Additional observations, recommendations, or areas of concern",
-    "compliance_score": 0-100,
-    "risk_level": "Low/Medium/High/Critical"
+    "evidence": "[specific text or evidence found]",
+    "explanation": "[how this evidence demonstrates compliance]",
+    "remarks": "[additional observations or recommendations]",
+    "compliance_score": [0-100],
+    "risk_level": "Low|Medium|High|Critical"
 }}
 
-COMPLIANCE SCORING GUIDE:
-- 90-100: Fully compliant with strong evidence
-- 70-89: Mostly compliant with minor gaps
-- 50-69: Partially compliant with significant gaps
-- 30-49: Minimally compliant with major concerns
-- 0-29: Non-compliant or insufficient evidence
-
-RISK LEVEL ASSESSMENT:
-- Low: Minor compliance gaps with low impact
-- Medium: Moderate gaps that may affect quality
-- High: Significant gaps that could impact patient care
-- Critical: Major compliance failures requiring immediate attention
-
-Be thorough, objective, and provide specific evidence from the document. If no evidence is found, clearly state this and explain what should be present for compliance.
+CRITICAL: If no evidence exists, return nothing. Do not explain why no evidence was found.
 """
     return prompt
 
@@ -184,22 +162,24 @@ def run_audit_on_text_by_page(pages: list[dict[str, str]], model: str = None, pr
             if 'compliance_requirements' in c:
                 prompt = create_ncqa_audit_prompt(c, page_text)
             else:
-                # Optimized prompt: Only return a result if evidence is found
+                # Token-efficient prompt: LLM only responds if evidence is found
                 prompt = (
-                    f"You are auditing a document page against the following criterion:\n\n"
-                    f"Criterion: '{c['criteria']}'\n"
+                    f"Audit this document page against the criterion: '{c['criteria']}'\n"
                     f"Category: {c['category']}\n"
                     f"Description: {c['description']}\n\n"
                     f"Document (Page {page_number}):\n{page_text}\n\n"
-                    "If evidence supporting this criterion is found on the page, respond ONLY with the following JSON:\n"
-                    "{\n"
-                    "  \"evidence\": \"...\",\n"
-                    "  \"explanation\": \"...\",\n"
-                    "  \"remarks\": \"...\",\n"
-                    "  \"compliance_score\": 0 to 100,\n"
-                    "  \"risk_level\": \"Low\" | \"Medium\" | \"High\"\n"
-                    "}\n"
-                    "If no evidence is found, return nothing at all. Do not respond with false or empty values."
+                    f"INSTRUCTIONS:\n"
+                    f"1. ONLY respond if you find specific evidence supporting this criterion\n"
+                    f"2. If no evidence is found, DO NOT respond at all (save tokens)\n"
+                    f"3. If evidence is found, respond with ONLY this JSON:\n"
+                    f"{{\n"
+                    f"  \"evidence\": \"[specific text or description of evidence]\",\n"
+                    f"  \"explanation\": \"[how this evidence supports the criterion]\",\n"
+                    f"  \"remarks\": \"[additional notes]\",\n"
+                    f"  \"compliance_score\": [0-100],\n"
+                    f"  \"risk_level\": \"Low|Medium|High\"\n"
+                    f"}}\n\n"
+                    f"CRITICAL: If no evidence exists, return nothing. Do not explain why no evidence was found."
                 )
 
             try:
@@ -207,24 +187,25 @@ def run_audit_on_text_by_page(pages: list[dict[str, str]], model: str = None, pr
                 parsed = extract_json_from_response(llm_response)
                 # print(f"llm_response: {llm_response}")
 
-                if not parsed or not isinstance(parsed, dict) or not parsed.get("evidence"):
-                    continue  # Skip if no evidence is found or JSON is empty
-
-                # Proceed if evidence is found
-                results.append({
-                    "criteria": c["criteria"],
-                    "category": c["category"],
-                    "factor": c.get("factor", ""),
-                    "evidence": parsed.get("evidence", ""),
-                    "explanation": parsed.get("explanation", ""),
-                    "remarks": parsed.get("remarks", ""),
-                    "compliance_score": parsed.get("compliance_score", 0),
-                    "risk_level": parsed.get("risk_level", "Unknown"),
-                    "page": page_number
-                })
+                # Since LLM only responds when evidence is found, simple validation is sufficient
+                if parsed and isinstance(parsed, dict) and parsed.get("evidence"):
+                    evidence = parsed.get("evidence", "")
+                    if evidence.strip():  # Basic check for non-empty evidence
+                        results.append({
+                            "criteria": c["criteria"],
+                            "category": c["category"],
+                            "factor": c.get("factor", ""),
+                            "evidence": evidence,
+                            "explanation": parsed.get("explanation", ""),
+                            "remarks": parsed.get("remarks", ""),
+                            "compliance_score": parsed.get("compliance_score", 0),
+                            "risk_level": parsed.get("risk_level", "Unknown"),
+                            "page": page_number
+                        })
 
             except Exception as e:
                 # Log error and continue with next
+                print(f"Error processing criteria '{c['criteria']}': {str(e)}")
                 continue
 
     return results

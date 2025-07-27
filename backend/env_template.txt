@@ -1,0 +1,33 @@
+# IntelliAudit Environment Configuration Template
+# Copy this to .env and fill in your values
+
+# LLM Provider Configuration
+# Options: 'custom', 'openai', 'gemini', 'huggingface'
+# Default: 'custom' (uses your custom endpoint)
+LLM_PROVIDER=custom
+
+# Custom LLM Endpoint Configuration
+# Your custom LLM endpoint URL
+CUSTOM_LLM_ENDPOINT=http://20.49.1.173:8000/generate
+
+# Optional API key for your custom endpoint (leave empty if not required)
+CUSTOM_LLM_API_KEY=
+
+# OpenAI Configuration (fallback)
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_API_BASE=https://api.openai.com/v1
+
+# Gemini Configuration (fallback)
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# Hugging Face Configuration (fallback)
+HUGGINGFACE_API_KEY=your_huggingface_api_key_here
+HUGGINGFACE_DEFAULT_MODEL=HuggingFaceH4/zephyr-7b-beta
+
+# Database Configuration
+DB_USERNAME=postgres.gestigjpiefkwstawvzx
+DB_PASSWORD=IntelliAudit$2025
+DB_HOST=aws-0-us-east-2.pooler.supabase.com
+DB_PORT=6543
+DB_NAME=postgres
+DB_SCHEMA=intelliaudit_dev 
