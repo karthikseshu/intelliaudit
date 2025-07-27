@@ -916,6 +916,12 @@ class EvidenceAnnotationUpdate(BaseModel):
     evidence_id: UUID
     annotation: Dict[str, Any]
 
+# New Pydantic model for audit request update
+class AuditRequestUpdate(BaseModel):
+    audit_request_id: UUID
+    status: str
+    current_step: str
+
 @router.put("/evidence/{evidence_id}/status")
 async def update_evidence_status(evidence_id: UUID, status_update: EvidenceStatusUpdate):
     """Update the review status of evidence"""
@@ -965,6 +971,58 @@ async def update_evidence_status(evidence_id: UUID, status_update: EvidenceStatu
             conn.rollback()
             conn.close()
         raise HTTPException(status_code=500, detail=f"Failed to update evidence status: {str(e)}")
+
+@router.put("/audits/{audit_request_id}/status")
+async def update_audit_request_status(audit_request_id: UUID, audit_update: AuditRequestUpdate):
+    """Update the status and current step of an audit request"""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Validate that the audit request exists
+        cursor.execute(
+            "SELECT audit_request_id FROM audit_requests WHERE audit_request_id = %s",
+            (str(audit_request_id),)
+        )
+        
+        if not cursor.fetchone():
+            conn.close()
+            raise HTTPException(status_code=404, detail="Audit request not found")
+        
+        # Update the audit request
+        now = datetime.utcnow()
+        cursor.execute(
+            """
+            UPDATE audit_requests 
+            SET status = %s, 
+                current_step = %s, 
+                started_at = %s, 
+                last_active_at = %s, 
+                updated_at = %s
+            WHERE audit_request_id = %s
+            """,
+            (
+                audit_update.status,
+                audit_update.current_step,
+                now,
+                now,
+                now,
+                str(audit_request_id)
+            )
+        )
+        
+        conn.commit()
+        conn.close()
+        
+        return {"message": "Success"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        if 'conn' in locals():
+            conn.rollback()
+            conn.close()
+        raise HTTPException(status_code=500, detail=f"Failed to update audit request: {str(e)}")
 
 @router.put("/evidence/{evidence_id}/annotation")
 async def update_evidence_annotation(evidence_id: UUID, annotation_update: EvidenceAnnotationUpdate):

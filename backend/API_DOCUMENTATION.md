@@ -146,18 +146,69 @@ Updates the annotation field of a specific evidence record.
 }
 ```
 
+## Audit Request Status Update API
+
+### Endpoint: `PUT /api/workflow/audits/{audit_request_id}/status`
+
+Updates the status and current step of a specific audit request.
+
+#### URL Parameters
+- `audit_request_id` (UUID, required): The unique identifier of the audit request to update
+
+#### Request Body
+```json
+{
+  "audit_request_id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "in_progress",
+  "current_step": "Document Review in Progress"
+}
+```
+
+#### Request Body Fields
+- `audit_request_id` (UUID, required): Must match the URL parameter
+- `status` (string, required): The new audit status. Valid values:
+  - `"not_started"` - Audit has been created but not started
+  - `"in_progress"` - Audit is currently being worked on
+  - `"paused"` - Audit is temporarily paused
+  - `"completed"` - Audit has been finished
+  - `"archived"` - Audit has been archived
+- `current_step` (string, required): Description of the current workflow step
+
+#### Response
+
+**Success (200 OK):**
+```json
+{
+  "message": "Success"
+}
+```
+
+**Error Responses:**
+
+**404 Not Found:**
+```json
+{
+  "detail": "Audit request not found"
+}
+```
+
+**500 Internal Server Error:**
+```json
+{
+  "detail": "Failed to update audit request: [error details]"
+}
+```
+
 #### Example Usage
 
 **Using curl:**
 ```bash
-curl -X PUT "http://localhost:8000/api/workflow/evidence/550e8400-e29b-41d4-a716-446655440000/annotation" \
+curl -X PUT "http://localhost:8000/api/workflow/audits/550e8400-e29b-41d4-a716-446655440000/status" \
   -H "Content-Type: application/json" \
   -d '{
-    "evidence_id": "550e8400-e29b-41d4-a716-446655440000",
-    "annotation": {
-      "user_notes": "Simple annotation test",
-      "confidence": "medium"
-    }
+    "audit_request_id": "550e8400-e29b-41d4-a716-446655440000",
+    "status": "in_progress",
+    "current_step": "AI Analysis and Evidence Extraction"
   }'
 ```
 
@@ -165,18 +216,16 @@ curl -X PUT "http://localhost:8000/api/workflow/evidence/550e8400-e29b-41d4-a716
 ```python
 import requests
 
-evidence_id = "550e8400-e29b-41d4-a716-446655440000"
-annotation_data = {
-    "evidence_id": evidence_id,
-    "annotation": {
-        "user_notes": "Simple annotation test",
-        "confidence": "medium"
-    }
+audit_request_id = "550e8400-e29b-41d4-a716-446655440000"
+audit_update_data = {
+    "audit_request_id": audit_request_id,
+    "status": "in_progress",
+    "current_step": "AI Analysis and Evidence Extraction"
 }
 
 response = requests.put(
-    f"http://localhost:8000/api/workflow/evidence/{evidence_id}/annotation",
-    json=annotation_data,
+    f"http://localhost:8000/api/workflow/audits/{audit_request_id}/status",
+    json=audit_update_data,
     headers={"Content-Type": "application/json"}
 )
 
@@ -186,15 +235,28 @@ else:
     print("Error:", response.text)
 ```
 
+#### Common Workflow Steps
+
+Typical `current_step` values for audit workflow:
+- `"Document Upload and Processing"`
+- `"AI Analysis and Evidence Extraction"`
+- `"Human Review and Validation"`
+- `"Compliance Assessment and Scoring"`
+- `"Report Generation"`
+- `"Audit Completed - Final Report Ready"`
+
 #### Database Changes
 
-The API updates the following fields in the `evidence` table:
-- `annotation`: Set to the provided JSONB annotation data
+The API updates the following fields in the `audit_requests` table:
+- `status`: Set to the provided status
+- `current_step`: Set to the provided current step description
+- `started_at`: Set to the current timestamp (if not already set)
+- `last_active_at`: Set to the current timestamp
 - `updated_at`: Set to the current timestamp
 
 #### Notes
 
-1. The evidence must exist in the database for the update to succeed
-2. The `annotation` field accepts any valid JSON structure
-3. The API automatically sets the `updated_at` timestamp
+1. The audit request must exist in the database for the update to succeed
+2. The `started_at` field is automatically set when the audit is first marked as "in_progress"
+3. The `last_active_at` field is updated on every status change
 4. The endpoint uses the `intelliaudit_dev` schema as configured in the database connection 
