@@ -158,11 +158,12 @@ CREATE TABLE IF NOT EXISTS intelliaudit_dev.evidence (
   document_id UUID REFERENCES intelliaudit_dev.documents(document_id),
   audit_area TEXT,
   checklist_item TEXT,
-  category_col JSONB,
+  criteria JSONB,
   page_number INT,
   extracted_text TEXT,
   ai_explanation JSONB,       -- highlight, logic, confidence
   confidence_score NUMERIC,   -- e.g., 95.0
+  annotation JSONB,
   reviewed_by UUID,
   review_status TEXT,         -- approved, rejected, pending
   reviewed_at TIMESTAMP,
@@ -287,3 +288,142 @@ CREATE INDEX IF NOT EXISTS idx_audit_request_areas_request_area ON intelliaudit_
 CREATE INDEX IF NOT EXISTS idx_documents_ai_classification ON intelliaudit_dev.documents USING GIN (ai_classification);
 CREATE INDEX IF NOT EXISTS idx_evidence_ai_explanation ON intelliaudit_dev.evidence USING GIN (ai_explanation);
 CREATE INDEX IF NOT EXISTS idx_evidence_category_col ON intelliaudit_dev.evidence USING GIN (category_col);
+
+-- =========================
+-- Table: config_metadata_types
+-- Purpose: Central metadata management for all configuration management dropdown values
+-- Features: Dynamic management of enum-like values without schema changes
+-- Date Added: 2025-08-06
+-- =========================
+CREATE TABLE IF NOT EXISTS intelliaudit_dev.config_metadata_types (
+  metadata_type_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  type_category VARCHAR(50) NOT NULL,          -- e.g., 'industry_type', 'risk_level', 'control_type'
+  type_value VARCHAR(100) NOT NULL,            -- e.g., 'Technology', 'High', 'Preventive'
+  type_code VARCHAR(50),                       -- Optional short code for API/system use
+  display_order INTEGER DEFAULT 0,             -- For UI sorting
+  is_active BOOLEAN DEFAULT true,
+  description TEXT,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+  created_by UUID,
+  updated_by UUID,
+  UNIQUE(type_category, type_value)
+);
+
+-- =========================
+-- Table: config_frameworks
+-- Purpose: Enhanced framework management supporting the Configuration Management UI
+-- Features: Framework code, version, industry classification, and comprehensive metadata
+-- Date Added: 2025-08-03
+-- Updated: 2025-08-06 - Replaced industry ENUM with metadata foreign key
+-- =========================
+CREATE TABLE IF NOT EXISTS intelliaudit_dev.config_frameworks (
+  framework_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  framework_code VARCHAR(50) UNIQUE NOT NULL,  -- e.g., ISO27001, SOC2, NCQA_HEDIS, HIPAA
+  framework_name TEXT NOT NULL,                -- e.g., Information Security Management, SOC 2 Type II
+  version VARCHAR(20) NOT NULL,                -- e.g., 2022, 2017, 2024, 2013
+  industry_type_id UUID REFERENCES intelliaudit_dev.config_metadata_types(metadata_type_id),
+  description TEXT,
+  summary TEXT,                                 -- Summary field visible in UI
+  is_active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+  created_by UUID,
+  updated_by UUID
+);
+
+-- =========================
+-- Table: config_process_areas
+-- Purpose: Process areas within frameworks (e.g., A.5 Information Security Policies)
+-- Features: Hierarchical process area management with risk assessment and business function mapping
+-- Date Added: 2025-08-03
+-- Updated: 2025-08-06 - Replaced risk_level and testing_frequency ENUMs with metadata foreign keys
+-- =========================
+CREATE TABLE IF NOT EXISTS intelliaudit_dev.config_process_areas (
+  process_area_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  framework_id UUID REFERENCES intelliaudit_dev.config_frameworks(framework_id) ON DELETE CASCADE,
+  process_area_code VARCHAR(20) NOT NULL,      -- e.g., A.5, A.6, A.8, A.9
+  process_area_name TEXT NOT NULL,             -- e.g., Information Security Policies
+  description TEXT,
+  risk_level_id UUID REFERENCES intelliaudit_dev.config_metadata_types(metadata_type_id),
+  business_function VARCHAR(100),              -- e.g., IT Security
+  testing_frequency_id UUID REFERENCES intelliaudit_dev.config_metadata_types(metadata_type_id),
+  --controls_count INTEGER DEFAULT 0,           -- Calculated field for UI display
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+  created_by UUID,
+  updated_by UUID,
+  UNIQUE(framework_id, process_area_code)
+);
+
+-- =========================
+-- Table: config_controls
+-- Purpose: Individual controls within process areas (e.g., A.5.1, A.5.2, A.5.3)
+-- Features: Control statements, types, and risk ratings for comprehensive audit control management
+-- Date Added: 2025-08-03
+-- Updated: 2025-08-06 - Replaced control_type, risk_level, evaluation_method, and testing_frequency ENUMs with metadata foreign keys
+-- =========================
+CREATE TABLE IF NOT EXISTS intelliaudit_dev.config_controls (
+  control_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  process_area_id UUID REFERENCES intelliaudit_dev.config_process_areas(process_area_id) ON DELETE CASCADE,
+  control_code VARCHAR(20) NOT NULL,           -- e.g., A.5.1, A.5.2, A.5.3
+  control_statement TEXT NOT NULL,             -- Full control statement text
+  control_type_id UUID REFERENCES intelliaudit_dev.config_metadata_types(metadata_type_id),
+  risk_rating_id UUID REFERENCES intelliaudit_dev.config_metadata_types(metadata_type_id),
+  testing_method_id UUID REFERENCES intelliaudit_dev.config_metadata_types(metadata_type_id),
+  frequency_id UUID REFERENCES intelliaudit_dev.config_metadata_types(metadata_type_id),
+  --criteria_count INTEGER DEFAULT 0,           -- Calculated field for UI display
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+  created_by UUID,
+  updated_by UUID,
+  UNIQUE(process_area_id, control_code)
+);
+
+-- =========================
+-- Table: config_criteria
+-- Purpose: Detailed criteria for each control (e.g., A.5.1.1, A.5.1.2, A.5.1.3)
+-- Features: Pass/fail thresholds, evaluation methods, materiality levels, and sampling requirements
+-- Date Added: 2025-08-03
+-- Updated: 2025-08-06 - Replaced evaluation_method and materiality_level ENUMs with metadata foreign keys
+-- =========================
+CREATE TABLE IF NOT EXISTS intelliaudit_dev.config_criteria (
+  criteria_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  control_id UUID REFERENCES intelliaudit_dev.config_controls(control_id) ON DELETE CASCADE,
+  criteria_code VARCHAR(30) NOT NULL,          -- e.g., A.5.1.1, A.5.1.2, A.5.1.3
+  criteria_statement TEXT NOT NULL,            -- e.g., Policy document exists
+  pass_fail_threshold TEXT,                    -- e.g., Policy document present
+  evaluation_method_id UUID REFERENCES intelliaudit_dev.config_metadata_types(metadata_type_id),
+  materiality_level_id UUID REFERENCES intelliaudit_dev.config_metadata_types(metadata_type_id),
+  sampling_required BOOLEAN DEFAULT false,
+  rules_count INTEGER DEFAULT 0,              -- Calculated field for UI display
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+  created_by UUID,
+  updated_by UUID,
+  UNIQUE(control_id, criteria_code)
+);
+
+
+-- =========================
+-- Table: config_assessment_rules
+-- Purpose: AI-powered assessment rules for automated evaluation (e.g., Document Exists, Policy Keywords)
+-- Features: Pattern matching, content analysis, confidence thresholds, and scoring weights
+-- Date Added: 2025-08-03
+-- Updated: 2025-08-06 - Replaced logic_type and rule_status ENUMs with metadata foreign keys
+-- =========================
+CREATE TABLE IF NOT EXISTS intelliaudit_dev.config_assessment_rules (
+  rule_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  criteria_id UUID REFERENCES intelliaudit_dev.config_criteria(criteria_id) ON DELETE CASCADE,
+  rule_name VARCHAR(100) NOT NULL,             -- e.g., Document Exists, Policy Keywords
+  logic_type_id UUID REFERENCES intelliaudit_dev.config_metadata_types(metadata_type_id),
+  rule_logic TEXT,                             -- Detailed rule logic description
+  keywords_patterns TEXT,                      -- Comma-separated keywords or patterns
+  confidence_threshold DECIMAL(3,2) DEFAULT 0.7, -- 0.0 to 1.0
+  scoring_weight DECIMAL(3,2) DEFAULT 0.5,    -- 0.0 to 1.0
+  status_id UUID REFERENCES intelliaudit_dev.config_metadata_types(metadata_type_id),
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+  created_by UUID,
+  updated_by UUID
+);
