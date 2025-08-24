@@ -25,10 +25,10 @@ CREATE TABLE IF NOT EXISTS intelliaudit_dev.metadata_audit_frameworks (
   framework_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT UNIQUE NOT NULL,       -- e.g., NCQA, HIPAA, SOX
   version TEXT,
-  created_at TIMESTAMP DEFAULT now(),
-  updated_at TIMESTAMP DEFAULT now(),
   created_by UUID,
-  updated_by UUID
+  updated_by UUID,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
 );
 
 -- =========================
@@ -40,10 +40,10 @@ CREATE TABLE IF NOT EXISTS intelliaudit_dev.metadata_audit_areas (
   framework_id UUID REFERENCES intelliaudit_dev.metadata_audit_frameworks(framework_id) ON DELETE SET NULL,
   name TEXT UNIQUE NOT NULL,       -- e.g., Credentialing, HEDIS Data Validation
   description TEXT,
-  created_at TIMESTAMP DEFAULT now(),
-  updated_at TIMESTAMP DEFAULT now(),
   created_by UUID,
-  updated_by UUID
+  updated_by UUID,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
 );
 
 -- Sample inserts for metadata tables
@@ -303,10 +303,10 @@ CREATE TABLE IF NOT EXISTS intelliaudit_dev.config_metadata_types (
   display_order INTEGER DEFAULT 0,             -- For UI sorting
   is_active BOOLEAN DEFAULT true,
   description TEXT,
-  created_at TIMESTAMP DEFAULT now(),
-  updated_at TIMESTAMP DEFAULT now(),
   created_by UUID,
   updated_by UUID,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
   UNIQUE(type_category, type_value)
 );
 
@@ -326,10 +326,10 @@ CREATE TABLE IF NOT EXISTS intelliaudit_dev.config_frameworks (
   description TEXT,
   summary TEXT,                                 -- Summary field visible in UI
   is_active BOOLEAN DEFAULT true,
-  created_at TIMESTAMP DEFAULT now(),
-  updated_at TIMESTAMP DEFAULT now(),
   created_by UUID,
-  updated_by UUID
+  updated_by UUID,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
 );
 
 -- =========================
@@ -349,10 +349,10 @@ CREATE TABLE IF NOT EXISTS intelliaudit_dev.config_process_areas (
   business_function VARCHAR(100),              -- e.g., IT Security
   testing_frequency_id UUID REFERENCES intelliaudit_dev.config_metadata_types(metadata_type_id),
   --controls_count INTEGER DEFAULT 0,           -- Calculated field for UI display
-  created_at TIMESTAMP DEFAULT now(),
-  updated_at TIMESTAMP DEFAULT now(),
   created_by UUID,
   updated_by UUID,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
   UNIQUE(framework_id, process_area_code)
 );
 
@@ -373,10 +373,10 @@ CREATE TABLE IF NOT EXISTS intelliaudit_dev.config_controls (
   testing_method_id UUID REFERENCES intelliaudit_dev.config_metadata_types(metadata_type_id),
   frequency_id UUID REFERENCES intelliaudit_dev.config_metadata_types(metadata_type_id),
   --criteria_count INTEGER DEFAULT 0,           -- Calculated field for UI display
-  created_at TIMESTAMP DEFAULT now(),
-  updated_at TIMESTAMP DEFAULT now(),
   created_by UUID,
   updated_by UUID,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
   UNIQUE(process_area_id, control_code)
 );
 
@@ -397,10 +397,10 @@ CREATE TABLE IF NOT EXISTS intelliaudit_dev.config_criteria (
   materiality_level_id UUID REFERENCES intelliaudit_dev.config_metadata_types(metadata_type_id),
   sampling_required BOOLEAN DEFAULT false,
   rules_count INTEGER DEFAULT 0,              -- Calculated field for UI display
-  created_at TIMESTAMP DEFAULT now(),
-  updated_at TIMESTAMP DEFAULT now(),
   created_by UUID,
   updated_by UUID,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
   UNIQUE(control_id, criteria_code)
 );
 
@@ -422,8 +422,117 @@ CREATE TABLE IF NOT EXISTS intelliaudit_dev.config_assessment_rules (
   confidence_threshold DECIMAL(3,2) DEFAULT 0.7, -- 0.0 to 1.0
   scoring_weight DECIMAL(3,2) DEFAULT 0.5,    -- 0.0 to 1.0
   status_id UUID REFERENCES intelliaudit_dev.config_metadata_types(metadata_type_id),
+  created_by UUID,
+  updated_by UUID,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+-- =========================
+-- Table: user_role_lkup
+-- Purpose: Lookup table for user roles in the system
+-- =========================
+CREATE TABLE IF NOT EXISTS intelliaudit_dev.user_role_lkup (
+  role_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  role_name TEXT NOT NULL,
+  role_type TEXT,  -- Nullable field for future use
+  is_active BOOLEAN DEFAULT TRUE,
+  created_by UUID,
+  updated_by UUID,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+-- =========================
+-- Table: app_user
+-- Purpose: Stores user information and authentication details
+-- =========================
+CREATE TABLE IF NOT EXISTS intelliaudit_dev.app_user (
+  user_uid UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  first_name TEXT NOT NULL,
+  last_name TEXT NOT NULL,
+  email TEXT UNIQUE NOT NULL,
+  role UUID REFERENCES intelliaudit_dev.user_role_lkup(role_id) ON DELETE RESTRICT,
+  department TEXT,
+  auth_type TEXT,  -- Changed from authType to auth_type for consistency
+  status TEXT DEFAULT 'active',
+  last_login_dt TIMESTAMP,  -- Changed from lastLogin_dt to last_login_dt for consistency
+  created_by UUID,
+  updated_by UUID,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+-- =========================
+-- Table: projects
+-- Purpose: Stores project information and lifecycle details
+-- =========================
+CREATE TABLE IF NOT EXISTS intelliaudit_dev.projects (
+  project_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_name TEXT NOT NULL,
+  project_desc TEXT,
+  status TEXT DEFAULT 'active',
+  start_dt DATE,
+  end_dt DATE,
+  created_by UUID,
+  updated_by UUID,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now()
+);
+
+-- =========================
+-- Table: projects_audit_frameworks
+-- Purpose: Junction table linking projects to audit frameworks
+-- =========================
+CREATE TABLE IF NOT EXISTS intelliaudit_dev.projects_audit_frameworks (
+  proj_aud_frmwk_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id UUID REFERENCES intelliaudit_dev.projects(project_id) ON DELETE CASCADE,
+  aud_frmwk_id UUID REFERENCES intelliaudit_dev.config_frameworks(framework_id) ON DELETE CASCADE,
+  created_by UUID,
+  updated_by UUID,
   created_at TIMESTAMP DEFAULT now(),
   updated_at TIMESTAMP DEFAULT now(),
-  created_by UUID,
-  updated_by UUID
+  UNIQUE(project_id, aud_frmwk_id)  -- Prevent duplicate associations
 );
+
+-- =========================
+-- Table: projects_users
+-- Purpose: Junction table linking projects, audit frameworks, and users
+-- =========================
+CREATE TABLE IF NOT EXISTS intelliaudit_dev.projects_users (
+  proj_users_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  project_id UUID REFERENCES intelliaudit_dev.projects(project_id) ON DELETE CASCADE,
+  user_uid UUID REFERENCES intelliaudit_dev.app_user(user_uid) ON DELETE CASCADE,
+  created_by UUID,
+  updated_by UUID,
+  created_at TIMESTAMP DEFAULT now(),
+  updated_at TIMESTAMP DEFAULT now(),
+  UNIQUE(project_id, user_uid)  -- Prevent duplicate user assignments
+);
+
+-- =========================
+-- Indexes for new tables
+-- =========================
+
+-- User role lookup indexes
+CREATE INDEX IF NOT EXISTS idx_user_role_lkup_role_name ON intelliaudit_dev.user_role_lkup(role_name);
+CREATE INDEX IF NOT EXISTS idx_user_role_lkup_is_active ON intelliaudit_dev.user_role_lkup(is_active);
+
+-- App user indexes
+CREATE INDEX IF NOT EXISTS idx_app_user_email ON intelliaudit_dev.app_user(email);
+CREATE INDEX IF NOT EXISTS idx_app_user_role ON intelliaudit_dev.app_user(role);
+CREATE INDEX IF NOT EXISTS idx_app_user_status ON intelliaudit_dev.app_user(status);
+CREATE INDEX IF NOT EXISTS idx_app_user_department ON intelliaudit_dev.app_user(department);
+CREATE INDEX IF NOT EXISTS idx_app_user_last_login ON intelliaudit_dev.app_user(last_login_dt);
+
+-- Projects indexes
+CREATE INDEX IF NOT EXISTS idx_projects_name ON intelliaudit_dev.projects(project_name);
+CREATE INDEX IF NOT EXISTS idx_projects_status ON intelliaudit_dev.projects(status);
+CREATE INDEX IF NOT EXISTS idx_projects_dates ON intelliaudit_dev.projects(start_dt, end_dt);
+
+-- Junction table indexes
+CREATE INDEX IF NOT EXISTS idx_projects_audit_frameworks_project ON intelliaudit_dev.projects_audit_frameworks(project_id);
+CREATE INDEX IF NOT EXISTS idx_projects_audit_frameworks_framework ON intelliaudit_dev.projects_audit_frameworks(aud_frmwk_id);
+CREATE INDEX IF NOT EXISTS idx_projects_users_project ON intelliaudit_dev.projects_users(project_id);
+CREATE INDEX IF NOT EXISTS idx_projects_users_framework ON intelliaudit_dev.projects_users(aud_frmwk_id);
+CREATE INDEX IF NOT EXISTS idx_projects_users_user ON intelliaudit_dev.projects_users(user_uid);
